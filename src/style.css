@@ -142,7 +142,20 @@ button:active { transform: translateY(1px); }
 }
 .themes button:hover { border-color: var(--line); }
 .themes button[aria-checked="true"] { background: var(--surface-selected); color: var(--text-strong); }
-.themes .dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: var(--shadow); }
+
+.colors { justify-content: center; gap: 12px; padding: 4px 0; }
+.colors button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: var(--shadow);
+}
+.colors button:hover { transform: scale(1.1); }
+.colors button[aria-checked="true"] {
+  box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--text-strong);
+}
 
 .status { margin: 0; min-height: 18px; text-align: center; font-size: 12px; }
 .status.ok { color: var(--ok); }

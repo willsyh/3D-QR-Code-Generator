@@ -10,12 +10,25 @@ const BORDER = 1; // cincin ubin terang di tepi alas
 const PAGE = 0xf6f1e7;
 const LIGHT_TILE = new THREE.Color('#ece6dc');
 
-// Jenis lampion. `profile(G)` memberi bentuk badan sebagai kurva putar:
+// Warna pola QR. `dark`/`dark2` harus cukup gelap agar QR tetap terbaca di atas
+// ubin terang; `paper` dipakai untuk rumbai dan pendar lampion.
+const COLORS = {
+  merah: { label: 'Merah', dark: '#7d1620', dark2: '#a3222a', paper: '#d8222b' },
+  jingga: { label: 'Jingga', dark: '#9a3f0e', dark2: '#bd5a1c', paper: '#ff9a3c' },
+  hijau: { label: 'Hijau', dark: '#1c5a2a', dark2: '#2c7a3b', paper: '#e2b04a' },
+  toska: { label: 'Toska', dark: '#0e5a5e', dark2: '#17787a', paper: '#e8a917' },
+  biru: { label: 'Biru', dark: '#1f2a6b', dark2: '#31409a', paper: '#f2c14e' },
+  ungu: { label: 'Ungu', dark: '#4a1d6b', dark2: '#6a2f96', paper: '#e9b949' },
+  pink: { label: 'Merah muda', dark: '#8a1c4f', dark2: '#b02a6a', paper: '#f48fb1' },
+  arang: { label: 'Arang', dark: '#2b2623', dark2: '#453c36', paper: '#c8202a' },
+};
+
+// Jenis lampion. `color` adalah warna bawaan saat jenis itu dipilih. `profile(G)` memberi bentuk badan sebagai kurva putar:
 // v = 0 (atas) sampai 1 (bawah) -> [jari-jari, tinggi], untuk QR selebar G ubin.
 const STYLES = {
   imlek: {
     label: 'Imlek',
-    paper: '#d8222b', trim: '#e2b04a', dark: '#7d1620', dark2: '#a3222a',
+    trim: '#e2b04a', color: 'merah',
     ribs: 12,
     profile: (G) => (v) => {
       const lat = 1.05 - 2.1 * v;
@@ -24,7 +37,7 @@ const STYLES = {
   },
   chochin: {
     label: 'Chochin',
-    paper: '#c8202a', trim: '#262220', dark: '#2b2623', dark2: '#453c36',
+    trim: '#262220', color: 'arang',
     hoops: 9,
     profile: (G) => (v) => {
       const s = 1 - 2 * v;
@@ -33,7 +46,7 @@ const STYLES = {
   },
   hoian: {
     label: 'Hoi An',
-    paper: '#e8a917', trim: '#5a3a22', dark: '#0e5a5e', dark2: '#17787a',
+    trim: '#5a3a22', color: 'toska',
     ribs: 8,
     profile: (G) => (v) => {
       const s = 1 - 2 * v;
@@ -42,7 +55,7 @@ const STYLES = {
   },
   terbang: {
     label: 'Terbang',
-    paper: '#ff9a3c', trim: '#8a5a2b', dark: '#9a3f0e', dark2: '#bd5a1c',
+    trim: '#8a5a2b', color: 'jingga',
     sky: true, // lampion terbang: tanpa tali dan rumbai, ada nyala api di bawah
     profile: (G) => (v) => {
       const f =
@@ -72,6 +85,7 @@ const ui = {
   canvas: $('scene'),
   text: $('text'),
   themes: $('themes'),
+  colors: $('colors'),
   toggle: $('toggle'),
   download: $('download'),
   status: $('status'),
@@ -321,6 +335,7 @@ function paintSkin(colorOf) {
 // ---------- State ----------
 
 let themeKey = 'imlek';
+let colorKey = STYLES.imlek.color;
 let grid = 0; // sel per sisi, termasuk BORDER
 let cells = []; // per ubin: warna, posisi datar, dan posisi di permukaan lampion
 let tiles = null;
@@ -444,7 +459,7 @@ function build() {
   s.far = grid * 4;
   s.updateProjectionMatrix();
 
-  applyTheme(themeKey);
+  applyTheme();
   writeTiles(show);
   verify(text);
 }
@@ -464,12 +479,11 @@ function clearScene() {
   }
 }
 
-function applyTheme(key) {
-  themeKey = key;
-  const theme = STYLES[key];
+function applyTheme() {
+  const theme = COLORS[colorKey];
   paperMat.color.set(theme.paper);
   paperMat.emissive.set(theme.paper);
-  trimMat.color.set(theme.trim);
+  trimMat.color.set(STYLES[themeKey].trim);
   glow.material.color.set(theme.paper).lerp(new THREE.Color('#ffd9a0'), 0.4);
   warmth.color.copy(glow.material.color);
   if (!tiles) return;
@@ -697,23 +711,44 @@ function setStatus(message, kind = '') {
   ui.status.className = `status ${kind}`;
 }
 
-for (const [key, theme] of Object.entries(STYLES)) {
+function syncChoices() {
+  for (const b of ui.themes.children) b.setAttribute('aria-checked', String(b.dataset.key === themeKey));
+  for (const b of ui.colors.children) b.setAttribute('aria-checked', String(b.dataset.key === colorKey));
+}
+
+for (const [key, style] of Object.entries(STYLES)) {
   const button = document.createElement('button');
   button.type = 'button';
+  button.dataset.key = key;
   button.setAttribute('role', 'radio');
-  button.setAttribute('aria-checked', String(key === themeKey));
-  const dot = document.createElement('span');
-  dot.className = 'dot';
-  dot.style.background = theme.dark2;
-  button.append(dot, theme.label);
+  button.textContent = style.label;
   button.addEventListener('click', () => {
     themeKey = key;
+    colorKey = style.color; // tiap jenis datang dengan warna bawaannya
     if (!qrMode) show = Math.min(show, 0.4); // ubin menyusun ulang ke bentuk baru
     build();
-    for (const b of ui.themes.children) b.setAttribute('aria-checked', String(b === button));
+    syncChoices();
   });
   ui.themes.append(button);
 }
+
+for (const [key, color] of Object.entries(COLORS)) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.key = key;
+  button.setAttribute('role', 'radio');
+  button.setAttribute('aria-label', color.label);
+  button.title = color.label;
+  button.style.background = color.dark2;
+  button.addEventListener('click', () => {
+    colorKey = key;
+    applyTheme();
+    verify(ui.text.value.trim());
+    syncChoices();
+  });
+  ui.colors.append(button);
+}
+syncChoices();
 
 let debounce;
 ui.text.addEventListener('input', () => {

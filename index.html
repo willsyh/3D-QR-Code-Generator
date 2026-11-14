@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lampion QR — Generator QR 3D</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cellipse cx='8' cy='8' rx='6' ry='5' fill='%23d8222b'/%3E%3Crect x='5' y='1.5' width='6' height='2' fill='%23e2b04a'/%3E%3Crect x='5' y='12.5' width='6' height='2' fill='%23e2b04a'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="scene" aria-label="Diorama lampion 3D di atas ubin kode QR"></canvas>
+
+    <h1 class="brand">Lampion QR</h1>
+
+    <p id="notice" class="notice" role="alert" hidden></p>
+
+    <main class="dock">
+      <button id="toggle" type="button" class="hint">Ketuk lampion untuk melihat kode QR</button>
+
+      <div class="row">
+        <input id="text" type="text" value="https://example.com" spellcheck="false"
+               autocomplete="off" aria-label="Teks atau tautan untuk kode QR" placeholder="Tempel tautan di sini" />
+        <button id="download" type="button" class="primary">Unduh PNG</button>
+      </div>
+
+      <div class="row themes" id="themes" role="radiogroup" aria-label="Jenis lampion"></div>
+
+      <p id="status" class="status" role="status"></p>
+    </main>
+
+    <script>
+      // Aplikasi ini perlu dijalankan lewat server dev (modul ES + paket npm).
+      setTimeout(function () {
+        if (window.__lampionReady) return;
+        var n = document.getElementById('notice');
+        n.hidden = false;
+        n.textContent =
+          'Tampilan 3D gagal dimuat. Jangan buka index.html langsung atau lewat Live Server — ' +
+          'jalankan "npm install" lalu "npm run dev" di terminal, kemudian buka alamat yang muncul (mis. http://localhost:5173).';
+      }, 3000);
+    </script>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

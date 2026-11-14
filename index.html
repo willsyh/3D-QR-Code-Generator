@@ -8,9 +8,16 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
+    <div id="sky" class="sky" aria-hidden="true"></div>
     <canvas id="scene" aria-label="Diorama lampion 3D di atas ubin kode QR"></canvas>
 
     <h1 class="brand">Lampion QR</h1>
+
+    <button id="mode" type="button" class="mode">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+      <span>Terang</span>
+    </button>
 
     <p id="notice" class="notice" role="alert" hidden></p>
 

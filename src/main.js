@@ -7,8 +7,34 @@ import { createMusic } from './music.js';
 // lampion, baris QR turun dari atas ke bawah. Ketuk untuk membentangkannya
 // kembali menjadi QR datar yang siap dipindai.
 
-const BORDER = 1; // cincin ubin terang di tepi alas
+const BORDER = 2; // cincin ubin terang di tepi alas
 const PAGE = 0xf6f1e7;
+
+// Mode tampilan. Nilai cahaya berlaku saat lampion tampil; saat QR dibentangkan
+// cahaya selalu kembali terang supaya kode tetap mudah dipindai.
+const MODES = {
+  terang: {
+    label: 'Terang', bg: '#f6f1e7', slab: '#cbbda9',
+    sky: new THREE.Color('#ffffff'), ground: new THREE.Color('#e6d8c4'), hemi: 2.1,
+    sun: new THREE.Color('#fff4e2'), sunLevel: 1.5,
+    emissive: 0.5, glow: 0.42, warmth: 1,
+    icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
+  },
+  gelap: {
+    label: 'Gelap', bg: '#17141b', slab: '#5a5260',
+    sky: new THREE.Color('#fff1dc'), ground: new THREE.Color('#3a3340'), hemi: 1.15,
+    sun: new THREE.Color('#ffe9cf'), sunLevel: 0.9,
+    emissive: 0.8, glow: 0.5, warmth: 1.8,
+    icon: '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
+  },
+  malam: {
+    label: 'Malam', bg: '#0a0f24', slab: '#454a68',
+    sky: new THREE.Color('#aab6ff'), ground: new THREE.Color('#1c1d38'), hemi: 0.7,
+    sun: new THREE.Color('#a9b8ff'), sunLevel: 0.5,
+    emissive: 1, glow: 0.7, warmth: 2.6,
+    icon: '<path d="M18 14.5A7.5 7.5 0 0 1 8.5 5a7.5 7.5 0 1 0 9.5 9.5z"/><path d="M17 3.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7zM21 9.5l.4 1 .9.4-.9.4-.4 1-.4-1-.9-.4.9-.4z"/>',
+  },
+};
 const LIGHT_TILE = new THREE.Color('#ece6dc');
 
 // Warna pola QR. `dark`/`dark2` harus cukup gelap agar QR tetap terbaca di atas
@@ -88,6 +114,8 @@ const ui = {
   themes: $('themes'),
   colors: $('colors'),
   sound: $('sound'),
+  mode: $('mode'),
+  sky: $('sky'),
   toggle: $('toggle'),
   download: $('download'),
   status: $('status'),
@@ -99,7 +127,7 @@ const ui = {
 
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: true });
+  renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: true, alpha: true });
 } catch (error) {
   window.__lampionReady = true;
   ui.notice.hidden = false;
@@ -112,12 +140,12 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.VSMShadowMap;
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(PAGE);
+const scene = new THREE.Scene(); // latar transparan: warna halaman diatur lewat CSS per mode
 
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0xe6d8c4, 2.1));
+const hemi = new THREE.HemisphereLight(0xffffff, 0xe6d8c4, 2.1);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff4e2, 1.5);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -336,6 +364,7 @@ function paintSkin(colorOf) {
 
 // ---------- State ----------
 
+let modeKey = 'terang';
 let themeKey = 'imlek';
 let colorKey = STYLES.imlek.color;
 let grid = 0; // sel per sisi, termasuk BORDER
@@ -501,7 +530,7 @@ function applyTheme() {
 }
 
 function verify(expected) {
-  const image = captureTop(512);
+  const image = captureTop(512, MODES[modeKey].bg); // uji dengan latar yang sedang tampil
   const result = jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
   if (result && result.data === expected) setStatus('✓ Kode QR terbaca', 'ok');
   else setStatus('Kode ini sulit dipindai. Coba teks yang lebih pendek.', 'warn');
@@ -589,6 +618,17 @@ function writeTiles(m) {
   tiles.instanceMatrix.needsUpdate = true;
 }
 
+// Cahaya adegan: k = 0 memakai suasana mode aktif, k = 1 terang penuh (untuk QR datar).
+function applyLighting(k) {
+  const mode = MODES[modeKey];
+  const day = MODES.terang;
+  hemi.color.copy(mode.sky).lerp(day.sky, k);
+  hemi.groundColor.copy(mode.ground).lerp(day.ground, k);
+  hemi.intensity = THREE.MathUtils.lerp(mode.hemi, day.hemi, k);
+  sun.color.copy(mode.sun).lerp(day.sun, k);
+  sun.intensity = THREE.MathUtils.lerp(mode.sunLevel, day.sunLevel, k);
+}
+
 function animate(t, dt) {
   if (!tiles) return;
   // Lampion berputar pelan; saat dibentangkan, putaran kembali ke posisi lurus.
@@ -623,8 +663,10 @@ function animate(t, dt) {
   tassel.rotation.z = Math.sin(t * 0.7 - 0.9) * 0.16 * fade;
   tassel.rotation.x = Math.sin(t * 0.53 + 0.1) * 0.11 * fade;
 
-  glow.material.opacity = 0.42 * fade;
-  warmth.intensity = grid * grid * 0.1 * fade;
+  const mode = MODES[modeKey];
+  glow.material.opacity = mode.glow * fade;
+  warmth.intensity = grid * grid * 0.1 * mode.warmth * fade;
+  applyLighting(1 - smooth(show));
 
   const base = THREE.MathUtils.lerp(1, 0.55, smooth(show));
   slab.scale.set(base, 1, base);
@@ -643,7 +685,7 @@ function tick() {
 // ---------- Tampak atas: verifikasi & unduhan ----------
 
 // Merender ubin QR dalam keadaan datar, tegak lurus dari atas.
-function captureTop(size) {
+function captureTop(size, background) {
   const span = grid / 2 + 2; // tepi terang 2 modul + BORDER = quiet zone
   const top = new THREE.OrthographicCamera(-span, span, span, -span, 0.1, 100);
   top.position.set(0, 50, 0);
@@ -655,6 +697,8 @@ function captureTop(size) {
   writeTiles(0);
   spin = savedSpin;
   const saved = [tiles.visible, glow.visible, warmth.intensity];
+  scene.background = new THREE.Color(background);
+  applyLighting(1);
   tiles.visible = true;
   parts.lantern.visible = glow.visible = false;
   warmth.intensity = 0;
@@ -668,6 +712,7 @@ function captureTop(size) {
   target.dispose();
 
   [tiles.visible, glow.visible, warmth.intensity] = saved;
+  scene.background = null;
   parts.lantern.visible = true;
 
   // Render target berisi warna linear dan terbalik secara vertikal.
@@ -693,7 +738,7 @@ const SRGB = Uint8Array.from({ length: 256 }, (_, i) => {
 
 function downloadPng() {
   if (!tiles) return;
-  const image = captureTop(1024);
+  const image = captureTop(1024, PAGE); // berkas unduhan selalu berlatar terang
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = image.width;
   canvas.getContext('2d').putImageData(image, 0, 0);
@@ -774,6 +819,59 @@ try {
 setMusic(musicPref !== 'off');
 ui.sound.addEventListener('click', () => setMusic(!music.enabled));
 
+// Mode tampilan: Terang -> Gelap -> Malam. Bawaan mengikuti preferensi sistem.
+function setMode(key, save = true) {
+  modeKey = key;
+  const mode = MODES[key];
+  document.documentElement.dataset.mode = key;
+  skinMat.emissiveIntensity = mode.emissive;
+  slabMat.color.set(mode.slab);
+  const order = Object.keys(MODES);
+  const next = MODES[order[(order.indexOf(key) + 1) % order.length]];
+  ui.mode.querySelector('svg').innerHTML = mode.icon;
+  ui.mode.querySelector('span').textContent = mode.label;
+  ui.mode.setAttribute('aria-label', `Mode tampilan: ${mode.label}. Ganti ke ${next.label}`);
+  if (tiles) verify(ui.text.value.trim());
+  if (!save) return;
+  try {
+    localStorage.setItem('lampion-mode', key);
+  } catch {
+    // Penyimpanan tidak tersedia: pilihan hanya berlaku untuk sesi ini.
+  }
+}
+ui.mode.addEventListener('click', () => {
+  const order = Object.keys(MODES);
+  setMode(order[(order.indexOf(modeKey) + 1) % order.length]);
+});
+
+// Langit malam: bintang dan lampion jauh yang naik pelan (hanya tampil di mode Malam).
+(() => {
+  const stars = (count) =>
+    Array.from({ length: count }, () => {
+      const alpha = (0.35 + Math.random() * 0.65).toFixed(2);
+      return `${(Math.random() * 100).toFixed(2)}vw ${(Math.random() * 100).toFixed(2)}vh 0 ${
+        Math.random() < 0.15 ? 1 : 0
+      }px rgba(255,255,255,${alpha})`;
+    }).join(',');
+  for (const name of ['stars a', 'stars b']) {
+    const layer = document.createElement('div');
+    layer.className = name;
+    layer.style.boxShadow = stars(70);
+    ui.sky.append(layer);
+  }
+  const moon = document.createElement('div');
+  moon.className = 'moon';
+  ui.sky.append(moon);
+  for (let i = 0; i < 10; i++) {
+    const far = document.createElement('div');
+    far.className = 'far';
+    const size = 5 + Math.random() * 9;
+    far.style.cssText = `left:${(Math.random() * 100).toFixed(1)}%;width:${size}px;height:${size * 1.25}px;` +
+      `animation-duration:${(26 + Math.random() * 30).toFixed(1)}s;animation-delay:-${(Math.random() * 50).toFixed(1)}s`;
+    ui.sky.append(far);
+  }
+})();
+
 let debounce;
 ui.text.addEventListener('input', () => {
   clearTimeout(debounce);
@@ -809,6 +907,14 @@ function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
 }
 window.addEventListener('resize', resize);
+
+let savedMode = null;
+try {
+  savedMode = localStorage.getItem('lampion-mode');
+} catch {
+  // Abaikan: pakai preferensi sistem.
+}
+setMode(MODES[savedMode] ? savedMode : matchMedia('(prefers-color-scheme: dark)').matches ? 'gelap' : 'terang', false);
 
 resize();
 build();

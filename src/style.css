@@ -127,8 +127,26 @@ button:active { transform: translateY(1px); }
 }
 .primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 
+.themes { display: flex; gap: 8px; flex: 1; min-width: 0; }
+
+.icon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: var(--surface-pill);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+}
+.icon:hover { border-color: var(--line); }
+.icon[data-on="true"] .cross, .icon[data-on="false"] .waves { display: none; }
+.icon[data-on="false"] { color: #8a7a68; }
+
 .themes button {
   flex: 1;
+  min-width: 0;
   height: 48px;
   display: flex;
   align-items: center;

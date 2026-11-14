@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import qrcode from 'qrcode-generator';
 import jsQR from 'jsqr';
+import { createMusic } from './music.js';
 
 // Ubin-ubin kode QR menggulung menjadi badan lampion: kolom QR melingkari
 // lampion, baris QR turun dari atas ke bawah. Ketuk untuk membentangkannya
@@ -86,6 +87,7 @@ const ui = {
   text: $('text'),
   themes: $('themes'),
   colors: $('colors'),
+  sound: $('sound'),
   toggle: $('toggle'),
   download: $('download'),
   status: $('status'),
@@ -749,6 +751,28 @@ for (const [key, color] of Object.entries(COLORS)) {
   ui.colors.append(button);
 }
 syncChoices();
+
+// Musik menyala secara bawaan; pilihan pengguna diingat untuk kunjungan berikutnya.
+const music = createMusic();
+function setMusic(on) {
+  music.setEnabled(on);
+  ui.sound.dataset.on = String(on);
+  ui.sound.setAttribute('aria-label', on ? 'Matikan musik' : 'Nyalakan musik');
+  ui.sound.title = on ? 'Matikan musik' : 'Nyalakan musik';
+  try {
+    localStorage.setItem('lampion-musik', on ? 'on' : 'off');
+  } catch {
+    // Penyimpanan tidak tersedia: pilihan hanya berlaku untuk sesi ini.
+  }
+}
+let musicPref = 'on';
+try {
+  musicPref = localStorage.getItem('lampion-musik') || 'on';
+} catch {
+  // Abaikan: pakai bawaan.
+}
+setMusic(musicPref !== 'off');
+ui.sound.addEventListener('click', () => setMusic(!music.enabled));
 
 let debounce;
 ui.text.addEventListener('input', () => {
